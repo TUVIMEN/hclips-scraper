@@ -1,0 +1,78 @@
+#!/bin/bash
+# by Dominik Stanisław Suchora <suchora.dominik7@gmail.com>
+# License: GNU GPLv3
+
+ucurl() {
+    curl -L -g -s --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) QtWebEngine/5.15.2 Chrome/87.0.4280.144 Safari/537.36' -H 'Accept-Encoding: gzip, deflate' --compressed -H 'Cookie: t8disclaimer=1' "$@"
+}
+
+declare threads='4' dir='.'
+declare -r arg0="$(basename "$0")"
+
+usage() {
+    printf '%s [OPTION...] [DIR]\n' "$(basename "$0")"
+    printf "Download, convert to json and save hclips pages from its sitemap.\n"
+    printf "Type of page depends on [-uv] options.\n"
+    printf "Pages will be saved in files named by their sitemap source and placed in DIR.\n\n"
+    printf "Options:\n"
+    printf "  -t NUM\tset number of used threads, by default set to 4\n"
+    printf "  -v\t\tvideos\n"
+    printf "  -u\t\tusers\n"
+    printf "  -h\t\tshow help\n"
+}
+
+videos() {
+    local rh rn
+    for i in $(ucurl 'https://hclips.com/sitemap/' | reliq 'loc m@B>"/sitemap_vids_[0-9]*" | "%i\n"')
+    do
+        [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
+        rh="$(sha256sum <<< "$i")"
+        rn="${rh%  *}"
+        [ -e "$rn" ] && continue
+        echo "$i"
+        {
+        for j in $(ucurl "$i" | reliq 'loc | "%i\n"' | awk -F '/' '$0 ~ /^https:\/\/hclips\.com\/videos\/[0-9]+\/.*\// { printf("https://hclips.com/api/json/video/86400/%d/%d/%d.json\n",int($5/1000000)*1000000,int($5/1000)*1000,$5)}')
+        do
+            ucurl "$j" -H 'Cookie: kt_lang=en; gender=str'
+        done | jq -r '. | "\(.video)"'
+        } > "$rn" &
+    done
+}
+
+users() {
+    local rh rn
+    for i in $(ucurl 'https://hclips.com/sitemap/' | reliq 'loc m@B>"/sitemap_members_[0-9]*" | "%i\n"')
+    do
+        [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
+        rh="$(sha256sum <<< "$i")"
+        rn="${rh%  *}"
+        [ -e "$rn" ] && continue
+        echo "$i"
+        {
+        for j in $(ucurl "$i" | reliq 'loc | "%i\n"' | cut -d/ -f5)
+        do
+            ucurl 'https://hclips.com/api/member.php' -X POST --data-raw "section=user&user_id=$j"
+        done | jq -r '. | "\(.user)"'
+        } > "$rn" &
+    done
+}
+
+[ "$#" -eq '0' ] && { usage >&2; exit 1; }
+
+while [ "$#" -gt 0 ]
+do
+    case "$1" in
+        -t) threads="$2"; shift;;
+        -v) func='videos';;
+        -u) func='users';;
+        -h) usage; exit 0;;
+        -*) printf '%s: invalid argument -- %s\n' "$(basename "$0")" "$1" >&2; exit 1;;
+        *) dir="$1";;
+    esac
+    shift
+done
+
+[ -z "$func" ] && { printf '%s: No option specified the type of pages\n' "$(basename "$0")" >&2; exit 1; }
+cd "$dir" || exit 1
+
+$func

@@ -29,10 +29,11 @@ videos() {
         rh="$(sha256sum <<< "$i")"
         rn="${rh%  *}"
         [ -e "$rn" ] && continue
-        echo "$i"
+        echo "$i" >&2
         {
         for j in $(ucurl "$i" | reliq 'loc | "%i\n"' | awk -F '/' '$0 ~ /^https:\/\/hclips\.com\/videos\/[0-9]+\/.*\// { printf("https://hclips.com/api/json/video/86400/%d/%d/%d.json\n",int($5/1000000)*1000000,int($5/1000)*1000,$5)}')
         do
+            echo "$j" >&2
             ucurl "$j" -H 'Cookie: kt_lang=en; gender=str'
         done | jq -r '. | "\(.video)"'
         } > "$rn" &
@@ -47,10 +48,11 @@ users() {
         rh="$(sha256sum <<< "$i")"
         rn="${rh%  *}"
         [ -e "$rn" ] && continue
-        echo "$i"
+        echo "$i" >&2
         {
         for j in $(ucurl "$i" | reliq 'loc | "%i\n"' | cut -d/ -f5)
         do
+            echo "$j" >&2
             ucurl 'https://hclips.com/api/member.php' -X POST --data-raw "section=user&user_id=$j"
         done | jq -r '. | "\(.user)"'
         } > "$rn" &

@@ -23,7 +23,7 @@ usage() {
 
 videos() {
     local rh rn
-    for i in $(ucurl 'https://hclips.com/sitemap/' | reliq 'loc m@B>"/sitemap_vids_[0-9]*" | "%i\n"')
+    for i in $(ucurl 'https://hclips.com/sitemap/' | reliq 'loc i@B>"/sitemap_vids_[0-9]*" | "%i\n"')
     do
         [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
         rh="$(sha256sum <<< "$i")"
@@ -42,7 +42,7 @@ videos() {
 
 users() {
     local rh rn
-    for i in $(ucurl 'https://hclips.com/sitemap/' | reliq 'loc m@B>"/sitemap_members_[0-9]*" | "%i\n"')
+    for i in $(ucurl 'https://hclips.com/sitemap/' | reliq 'loc i@B>"/sitemap_members_[0-9]*" | "%i\n"')
     do
         [ "$(jobs | wc -l)" -gt "$threads" ] && wait %%
         rh="$(sha256sum <<< "$i")"
